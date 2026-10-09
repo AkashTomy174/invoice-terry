@@ -13,16 +13,30 @@ import {
   UserPlus,
   ArrowRight,
   RotateCw,
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+  X,
 } from 'lucide-react';
 import { Customer, Purchase } from '@/lib/types';
+
+const PAGE_SIZE = 20;
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [rewardOnly, setRewardOnly] = useState(false);
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerPurchases, setCustomerPurchases] = useState<Purchase[]>([]);
   const [isLoadingPurchases, setIsLoadingPurchases] = useState(false);
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   // New Customer Modal
   const [showAddModal, setShowAddModal] = useState(false);
@@ -34,21 +48,41 @@ export default function CustomersPage() {
 
   useEffect(() => {
     fetchCustomers();
-  }, [searchQuery]);
+  }, [searchQuery, rewardOnly, filterFrom, filterTo, page]);
 
   const fetchCustomers = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/customers?q=${encodeURIComponent(searchQuery)}`);
+      const params = new URLSearchParams();
+      params.set('q', searchQuery);
+      params.set('page', String(page));
+      params.set('pageSize', String(PAGE_SIZE));
+      if (rewardOnly) params.set('reward', 'unlocked');
+      if (filterFrom) params.set('from', filterFrom);
+      if (filterTo) params.set('to', filterTo);
+
+      const res = await fetch(`/api/customers?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
         setCustomers(data.customers);
+        setTotalPages(data.totalPages || 1);
+        setTotalCount(data.total ?? data.customers.length);
+        if (data.page && data.page !== page) setPage(data.page);
       }
     } catch (err) {
       console.error(err);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const hasActiveFilters = Boolean(rewardOnly || filterFrom || filterTo);
+
+  const clearFilters = () => {
+    setRewardOnly(false);
+    setFilterFrom('');
+    setFilterTo('');
+    setPage(1);
   };
 
   const handleSelectCustomer = async (cust: Customer) => {
@@ -126,18 +160,79 @@ export default function CustomersPage() {
         </button>
       </div>
 
-      {/* Search Input Bar */}
-      <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
-          <Search className="w-4 h-4" />
+      {/* Search & Filter Bar */}
+      <div className="space-y-3">
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
+            <Search className="w-4 h-4" />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search by phone number, name, or customer ID..."
+            className="w-full pl-10 pr-4 py-3 bg-white rounded-xl border border-neutral-300 focus:border-black focus:ring-1 focus:ring-black text-sm outline-hidden shadow-xs"
+          />
         </div>
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by phone number, name, or customer ID..."
-          className="w-full pl-10 pr-4 py-3 bg-white rounded-xl border border-neutral-300 focus:border-black focus:ring-1 focus:ring-black text-sm outline-hidden shadow-xs"
-        />
+
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <label className="inline-flex items-center gap-2 text-xs font-semibold text-neutral-700 bg-white border border-neutral-300 rounded-lg px-3 py-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={rewardOnly}
+              onChange={(e) => {
+                setRewardOnly(e.target.checked);
+                setPage(1);
+              }}
+              className="accent-black"
+            />
+            <Gift className="w-3.5 h-3.5 text-amber-600" />
+            <span>Reward unlocked only</span>
+          </label>
+
+          <div className="flex items-center gap-2 text-xs text-neutral-500 font-semibold shrink-0">
+            <CalendarDays className="w-4 h-4" />
+            <span>Joined:</span>
+          </div>
+          <input
+            type="date"
+            value={filterFrom}
+            max={filterTo || undefined}
+            onChange={(e) => {
+              setFilterFrom(e.target.value);
+              setPage(1);
+            }}
+            className="px-3 py-2 bg-white border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 outline-hidden"
+          />
+          <span className="text-xs text-neutral-400">to</span>
+          <input
+            type="date"
+            value={filterTo}
+            min={filterFrom || undefined}
+            onChange={(e) => {
+              setFilterTo(e.target.value);
+              setPage(1);
+            }}
+            className="px-3 py-2 bg-white border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 outline-hidden"
+          />
+
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 text-xs font-bold text-neutral-500 hover:text-rose-600 px-2 py-1"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Clear filters</span>
+            </button>
+          )}
+
+          <span className="text-xs text-neutral-400 sm:ml-auto">
+            {isLoading ? 'Loading…' : `${totalCount} customer${totalCount === 1 ? '' : 's'} found`}
+          </span>
+        </div>
       </div>
 
       {/* Main Grid: Customers List & Detail View */}
@@ -212,6 +307,35 @@ export default function CustomersPage() {
                 </div>
               );
             })
+          )}
+
+          {/* Pagination Controls */}
+          {!isLoading && totalCount > 0 && (
+            <div className="flex items-center justify-between gap-3 px-4 py-3 bg-white rounded-xl border border-neutral-200">
+              <span className="text-[11px] text-neutral-500">
+                Page <strong className="text-neutral-800">{page}</strong> of{' '}
+                <strong className="text-neutral-800">{totalPages}</strong>
+                {' '}&bull; {totalCount} total
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-neutral-700 bg-white border border-neutral-300 rounded-lg hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Prev</span>
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-neutral-700 bg-white border border-neutral-300 rounded-lg hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           )}
         </div>
 

@@ -6,9 +6,18 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q')?.trim().toLowerCase() || '';
+    const pageSize = Math.max(1, Math.min(200, parseInt(searchParams.get('pageSize') || '20', 10) || 20));
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+    // 'reward' narrows to customers whose loyalty reward is currently unlocked.
+    const rewardOnly = searchParams.get('reward') === 'unlocked';
+    // Date range filters against when the customer joined (created_at), yyyy-mm-dd, inclusive.
+    const fromParam = searchParams.get('from');
+    const toParam = searchParams.get('to');
+    const fromTime = fromParam ? new Date(`${fromParam}T00:00:00.000Z`).getTime() : null;
+    const toTime = toParam ? new Date(`${toParam}T23:59:59.999Z`).getTime() : null;
 
     const db = await readDb();
-    let customers = db.customers;
+    let customers = [...db.customers];
 
     if (query) {
       customers = customers.filter(
@@ -19,7 +28,35 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.json({ success: true, customers });
+    if (rewardOnly) {
+      customers = customers.filter((c) => c.loyalty_reward_unlocked);
+    }
+
+    if (fromTime !== null && !isNaN(fromTime)) {
+      customers = customers.filter((c) => new Date(c.created_at).getTime() >= fromTime);
+    }
+
+    if (toTime !== null && !isNaN(toTime)) {
+      customers = customers.filter((c) => new Date(c.created_at).getTime() <= toTime);
+    }
+
+    // Sort newest customer first by default.
+    customers.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    const total = customers.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = Math.min(page, totalPages);
+    const offset = (safePage - 1) * pageSize;
+    const paginated = customers.slice(offset, offset + pageSize);
+
+    return NextResponse.json({
+      success: true,
+      customers: paginated,
+      total,
+      page: safePage,
+      pageSize,
+      totalPages,
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
