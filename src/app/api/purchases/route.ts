@@ -34,15 +34,34 @@ function saveInvoiceImage(purchaseId: string, imageDataUrl: string) {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
+    const pageSize = Math.max(1, Math.min(200, parseInt(searchParams.get('limit') || searchParams.get('pageSize') || '50', 10) || 50));
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
     const status = searchParams.get('status');
     const search = searchParams.get('q')?.toLowerCase();
+    const paymentMethod = searchParams.get('payment_method');
+    // Date range filters: 'from'/'to' are yyyy-mm-dd, inclusive, matched against created_at.
+    const fromParam = searchParams.get('from');
+    const toParam = searchParams.get('to');
+    const fromTime = fromParam ? new Date(`${fromParam}T00:00:00.000Z`).getTime() : null;
+    const toTime = toParam ? new Date(`${toParam}T23:59:59.999Z`).getTime() : null;
 
     const db = await readDb();
     let purchases = [...db.purchases];
 
     if (status) {
       purchases = purchases.filter((p) => p.status === status);
+    }
+
+    if (paymentMethod) {
+      purchases = purchases.filter((p) => p.payment_method === paymentMethod);
+    }
+
+    if (fromTime !== null && !isNaN(fromTime)) {
+      purchases = purchases.filter((p) => new Date(p.created_at).getTime() >= fromTime);
+    }
+
+    if (toTime !== null && !isNaN(toTime)) {
+      purchases = purchases.filter((p) => new Date(p.created_at).getTime() <= toTime);
     }
 
     if (search) {
@@ -57,10 +76,19 @@ export async function GET(request: Request) {
     // Sort descending by date
     purchases.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
+    const total = purchases.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = Math.min(page, totalPages);
+    const offset = (safePage - 1) * pageSize;
+    const paginated = purchases.slice(offset, offset + pageSize);
+
     return NextResponse.json({
       success: true,
-      purchases: purchases.slice(0, limit),
-      total: purchases.length,
+      purchases: paginated,
+      total,
+      page: safePage,
+      pageSize,
+      totalPages,
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

@@ -13,17 +13,31 @@ import {
   XCircle,
   Eye,
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+  X,
 } from 'lucide-react';
 import { Purchase, ShopSettings } from '@/lib/types';
 import { generateInvoicePdf } from '@/lib/pdf';
 import CashMemoPreview from '@/components/CashMemoPreview';
 
+const PAGE_SIZE = 20;
+
 export default function InvoicesPage() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('');
+  const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>('');
+  const [filterFrom, setFilterFrom] = useState<string>('');
+  const [filterTo, setFilterTo] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   // Preview Modal
   const [viewPurchase, setViewPurchase] = useState<Purchase | null>(null);
@@ -39,7 +53,7 @@ export default function InvoicesPage() {
   useEffect(() => {
     fetchInvoices();
     fetchSettings();
-  }, [search, filterStatus]);
+  }, [search, filterStatus, filterPaymentMethod, filterFrom, filterTo, page]);
 
   const fetchSettings = async () => {
     try {
@@ -52,18 +66,39 @@ export default function InvoicesPage() {
   const fetchInvoices = async () => {
     setIsLoading(true);
     try {
-      let url = `/api/purchases?q=${encodeURIComponent(search)}`;
-      if (filterStatus) url += `&status=${filterStatus}`;
-      const res = await fetch(url);
+      const params = new URLSearchParams();
+      params.set('q', search);
+      params.set('page', String(page));
+      params.set('pageSize', String(PAGE_SIZE));
+      if (filterStatus) params.set('status', filterStatus);
+      if (filterPaymentMethod) params.set('payment_method', filterPaymentMethod);
+      if (filterFrom) params.set('from', filterFrom);
+      if (filterTo) params.set('to', filterTo);
+
+      const res = await fetch(`/api/purchases?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
         setPurchases(data.purchases || []);
+        setTotalPages(data.totalPages || 1);
+        setTotalCount(data.total || 0);
+        // If the server clamped the page (e.g. filters shrank the result set), stay in sync.
+        if (data.page && data.page !== page) setPage(data.page);
       }
     } catch (err) {
       console.error(err);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const hasActiveFilters = Boolean(filterStatus || filterPaymentMethod || filterFrom || filterTo);
+
+  const clearFilters = () => {
+    setFilterStatus('');
+    setFilterPaymentMethod('');
+    setFilterFrom('');
+    setFilterTo('');
+    setPage(1);
   };
 
   const handleDownloadPdf = (purchase: Purchase) => {
@@ -128,29 +163,94 @@ export default function InvoicesPage() {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
-            <Search className="w-4 h-4" />
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
+              <Search className="w-4 h-4" />
+            </div>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Search by invoice number, customer name, or phone..."
+              className="w-full pl-10 pr-4 py-2.5 bg-white rounded-lg border border-neutral-300 focus:border-black text-xs outline-hidden shadow-xs"
+            />
           </div>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by invoice number, customer name, or phone..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white rounded-lg border border-neutral-300 focus:border-black text-xs outline-hidden shadow-xs"
-          />
+
+          <select
+            value={filterStatus}
+            onChange={(e) => {
+              setFilterStatus(e.target.value);
+              setPage(1);
+            }}
+            className="px-3 py-2.5 bg-white border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 outline-hidden"
+          >
+            <option value="">All Statuses</option>
+            <option value="COMPLETED">Completed Only</option>
+            <option value="CANCELLED">Cancelled Only</option>
+          </select>
+
+          <select
+            value={filterPaymentMethod}
+            onChange={(e) => {
+              setFilterPaymentMethod(e.target.value);
+              setPage(1);
+            }}
+            className="px-3 py-2.5 bg-white border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 outline-hidden"
+          >
+            <option value="">All Payment Methods</option>
+            <option value="CASH">Cash</option>
+            <option value="UPI">UPI</option>
+            <option value="CARD">Card</option>
+            <option value="OTHER">Other</option>
+          </select>
         </div>
 
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-3 py-2.5 bg-white border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 outline-hidden"
-        >
-          <option value="">All Statuses</option>
-          <option value="COMPLETED">Completed Only</option>
-          <option value="CANCELLED">Cancelled Only</option>
-        </select>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2 text-xs text-neutral-500 font-semibold shrink-0">
+            <CalendarDays className="w-4 h-4" />
+            <span>Date range:</span>
+          </div>
+          <input
+            type="date"
+            value={filterFrom}
+            max={filterTo || undefined}
+            onChange={(e) => {
+              setFilterFrom(e.target.value);
+              setPage(1);
+            }}
+            className="px-3 py-2 bg-white border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 outline-hidden"
+          />
+          <span className="text-xs text-neutral-400">to</span>
+          <input
+            type="date"
+            value={filterTo}
+            min={filterFrom || undefined}
+            onChange={(e) => {
+              setFilterTo(e.target.value);
+              setPage(1);
+            }}
+            className="px-3 py-2 bg-white border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 outline-hidden"
+          />
+
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 text-xs font-bold text-neutral-500 hover:text-rose-600 px-2 py-1"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Clear filters</span>
+            </button>
+          )}
+
+          <span className="text-xs text-neutral-400 sm:ml-auto">
+            {isLoading ? 'Loading…' : `${totalCount} invoice${totalCount === 1 ? '' : 's'} found`}
+          </span>
+        </div>
       </div>
 
       {/* Purchases Table */}
@@ -277,6 +377,35 @@ export default function InvoicesPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {!isLoading && totalCount > 0 && (
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-neutral-200 bg-neutral-50">
+            <span className="text-[11px] text-neutral-500">
+              Page <strong className="text-neutral-800">{page}</strong> of{' '}
+              <strong className="text-neutral-800">{totalPages}</strong>
+              {' '}&bull; {totalCount} total
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-neutral-700 bg-white border border-neutral-300 rounded-lg hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Prev</span>
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-neutral-700 bg-white border border-neutral-300 rounded-lg hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <span>Next</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Cash Memo View Modal */}
