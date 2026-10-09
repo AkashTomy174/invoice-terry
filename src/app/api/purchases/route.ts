@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     const status = searchParams.get('status');
     const search = searchParams.get('q')?.toLowerCase();
 
-    const db = readDb();
+    const db = await readDb();
     let purchases = [...db.purchases];
 
     if (status) {

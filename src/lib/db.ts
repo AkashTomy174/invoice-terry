@@ -1,6 +1,7 @@
-import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import bcrypt from 'bcryptjs';
+import { Pool, type PoolClient } from 'pg';
 import {
   User,
   Customer,
@@ -25,60 +26,67 @@ export interface DatabaseSchema {
   };
 }
 
-import os from 'os';
+// Invoice photos are still kept on local disk (see saveInvoiceImage in the
+// purchases route). On Vercel this directory lives under the serverless
+// function's ephemeral /tmp and will NOT survive between cold starts or
+// deployments — only the structured data below (customers, purchases,
+// settings, etc.) is made durable via Postgres.
+const isServerless =
+  Boolean(process.env.NETLIFY) ||
+  Boolean(process.env.VERCEL) ||
+  Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+  Boolean(process.env.LAMBDA_TASK_ROOT) ||
+  process.cwd().startsWith('/var/task');
 
-function resolveDataDir(): string {
-  const isServerless =
-    Boolean(process.env.NETLIFY) ||
-    Boolean(process.env.VERCEL) ||
-    Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
-    Boolean(process.env.LAMBDA_TASK_ROOT) ||
-    process.cwd().startsWith('/var/task');
-
-  if (isServerless) {
-    return path.join(os.tmpdir(), 'terry-data');
-  }
-
-  const localDir = path.join(process.cwd(), 'data');
-  try {
-    if (!fs.existsSync(localDir)) {
-      fs.mkdirSync(localDir, { recursive: true });
-    }
-    const testFile = path.join(localDir, '.write-test');
-    fs.writeFileSync(testFile, '1');
-    fs.unlinkSync(testFile);
-    return localDir;
-  } catch {
-    return path.join(os.tmpdir(), 'terry-data');
-  }
-}
-
-export const DATA_DIR = resolveDataDir();
-export const DB_FILE = path.join(DATA_DIR, 'terry.db.json');
+export const DATA_DIR = isServerless
+  ? path.join(os.tmpdir(), 'terry-data')
+  : path.join(process.cwd(), 'data');
 export const INVOICES_DIR = path.join(DATA_DIR, 'invoices');
 
-// Ensure data directory exists and seed is copied if on serverless
-export function ensureDataDir() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    if (!fs.existsSync(INVOICES_DIR)) {
-      fs.mkdirSync(INVOICES_DIR, { recursive: true });
-    }
+// ---------------------------------------------------------------------------
+// Postgres connection
+// ---------------------------------------------------------------------------
 
-    // If running in /tmp and file does not exist, copy from bundled data if present
-    const bundledDb = path.join(process.cwd(), 'data', 'terry.db.json');
-    if (!fs.existsSync(DB_FILE) && fs.existsSync(bundledDb) && bundledDb !== DB_FILE) {
-      try {
-        fs.copyFileSync(bundledDb, DB_FILE);
-      } catch (copyErr) {
-        console.warn('Could not copy bundled DB to writable path:', copyErr);
-      }
-    }
-  } catch (err) {
-    console.warn('ensureDataDir warning:', err);
+let pool: Pool | null = null;
+
+function getPool(): Pool {
+  if (pool) return pool;
+
+  const connectionString = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL;
+  if (!connectionString) {
+    throw new Error(
+      'DATABASE_URL (or DATABASE_PUBLIC_URL) is not set. Configure it to your Postgres connection string.'
+    );
   }
+
+  pool = new Pool({
+    connectionString,
+    // Railway's bare postgres:16 image does not terminate TLS on the public
+    // TCP proxy or the private network, so plain TCP is expected here.
+    ssl: /sslmode=require/.test(connectionString) ? { rejectUnauthorized: false } : undefined,
+    max: 5,
+  });
+  return pool;
+}
+
+const SCHEMA_TABLE = 'app_state';
+const SINGLETON_ID = 'terry';
+
+let schemaReadyPromise: Promise<void> | null = null;
+
+async function ensureSchema(): Promise<void> {
+  if (schemaReadyPromise) return schemaReadyPromise;
+  schemaReadyPromise = (async () => {
+    const p = getPool();
+    await p.query(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA_TABLE} (
+        id TEXT PRIMARY KEY,
+        data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
+  })();
+  return schemaReadyPromise;
 }
 
 // Generate unique ID helper
@@ -301,58 +309,98 @@ function createInitialSeed(): DatabaseSchema {
   };
 }
 
-export function readDb(): DatabaseSchema {
-  // Use memory cache if available and file cannot be accessed
-  const memCache = (globalThis as any).__TERRY_DB_CACHE__ as DatabaseSchema | undefined;
+// ---------------------------------------------------------------------------
+// Public data-access API (same shape as the old file-backed version, now
+// backed by a single JSONB row in Postgres so it survives Vercel's
+// ephemeral filesystem and serverless cold starts).
+// ---------------------------------------------------------------------------
 
-  ensureDataDir();
-  if (!fs.existsSync(DB_FILE)) {
-    if (memCache) return memCache;
-    const initial = createInitialSeed();
-    try {
-      fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), 'utf-8');
-    } catch (e) {
-      console.warn('Could not write initial seed to disk (in-memory mode):', e);
+/** Plain read: no row lock, safe for GET handlers that don't mutate. */
+export async function readDb(): Promise<DatabaseSchema> {
+  await ensureSchema();
+  const p = getPool();
+
+  const { rows } = await p.query<{ data: DatabaseSchema }>(
+    `SELECT data FROM ${SCHEMA_TABLE} WHERE id = $1`,
+    [SINGLETON_ID]
+  );
+
+  if (rows.length > 0) {
+    return rows[0].data;
+  }
+
+  // First boot: seed the row.
+  const initial = createInitialSeed();
+  await p.query(
+    `INSERT INTO ${SCHEMA_TABLE} (id, data) VALUES ($1, $2)
+     ON CONFLICT (id) DO NOTHING`,
+    [SINGLETON_ID, JSON.stringify(initial)]
+  );
+  // Re-read in case another concurrent cold start seeded it first, so every
+  // caller converges on the same row.
+  const { rows: afterInsert } = await p.query<{ data: DatabaseSchema }>(
+    `SELECT data FROM ${SCHEMA_TABLE} WHERE id = $1`,
+    [SINGLETON_ID]
+  );
+  return afterInsert[0].data;
+}
+
+/**
+ * Atomic read-modify-write. Takes a row lock (`SELECT ... FOR UPDATE`) for
+ * the duration of the transaction so two concurrent purchases can no longer
+ * race each other and silently clobber one another's writes, which the old
+ * read-whole-file / write-whole-file version was vulnerable to.
+ */
+export async function withTransaction<T>(
+  callback: (db: DatabaseSchema) => Promise<T> | T
+): Promise<T> {
+  await ensureSchema();
+  const p = getPool();
+  const client: PoolClient = await p.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    let { rows } = await client.query<{ data: DatabaseSchema }>(
+      `SELECT data FROM ${SCHEMA_TABLE} WHERE id = $1 FOR UPDATE`,
+      [SINGLETON_ID]
+    );
+
+    if (rows.length === 0) {
+      const initial = createInitialSeed();
+      await client.query(
+        `INSERT INTO ${SCHEMA_TABLE} (id, data) VALUES ($1, $2)`,
+        [SINGLETON_ID, JSON.stringify(initial)]
+      );
+      rows = [{ data: initial }];
     }
-    (globalThis as any).__TERRY_DB_CACHE__ = initial;
-    return initial;
-  }
 
-  try {
-    const raw = fs.readFileSync(DB_FILE, 'utf-8');
-    const parsed = JSON.parse(raw) as DatabaseSchema;
-    (globalThis as any).__TERRY_DB_CACHE__ = parsed;
-    return parsed;
+    const db = rows[0].data;
+    const result = await callback(db);
+
+    await client.query(
+      `UPDATE ${SCHEMA_TABLE} SET data = $1, updated_at = now() WHERE id = $2`,
+      [JSON.stringify(db), SINGLETON_ID]
+    );
+
+    await client.query('COMMIT');
+    return result;
   } catch (err) {
-    if (memCache) return memCache;
-    console.error('Error reading database, restoring seed backup:', err);
-    const initial = createInitialSeed();
-    try {
-      fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), 'utf-8');
-    } catch {}
-    (globalThis as any).__TERRY_DB_CACHE__ = initial;
-    return initial;
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
   }
 }
 
-export function writeDb(data: DatabaseSchema): void {
-  // Always update in-memory cache first so next read immediately sees changes
-  (globalThis as any).__TERRY_DB_CACHE__ = data;
-
-  try {
-    ensureDataDir();
-    const tempFile = `${DB_FILE}.tmp`;
-    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
-    fs.renameSync(tempFile, DB_FILE);
-  } catch (writeErr) {
-    console.warn('Could not persist database to disk (persisting in memory cache):', writeErr);
-  }
-}
-
-// Transaction lock helper for atomic purchase execution
-export async function withTransaction<T>(callback: (db: DatabaseSchema) => Promise<T> | T): Promise<T> {
-  const db = readDb();
-  const result = await callback(db);
-  writeDb(db);
-  return result;
+/**
+ * Lightweight connectivity check used by the keep-alive endpoint. Doesn't
+ * touch app_state at all — just proves the connection pool can round-trip a
+ * query, which is also what prevents the Railway free-tier database from
+ * being flagged inactive and paused.
+ */
+export async function pingDb(): Promise<{ ok: true; now: string }> {
+  const p = getPool();
+  const { rows } = await p.query<{ now: Date }>('SELECT now()');
+  return { ok: true, now: rows[0].now.toISOString() };
 }

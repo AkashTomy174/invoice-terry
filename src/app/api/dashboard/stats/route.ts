@@ -4,7 +4,7 @@ import { DashboardStats, PaymentMethod } from '@/lib/types';
 
 export async function GET() {
   try {
-    const db = readDb();
+    const db = await readDb();
     const purchases = db.purchases.filter((p) => p.status === 'COMPLETED');
     const todayStr = new Date().toISOString().split('T')[0];
 

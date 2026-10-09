@@ -9,7 +9,7 @@ export async function GET() {
       return NextResponse.json({ authenticated: false, user: null });
     }
 
-    const db = readDb();
+    const db = await readDb();
     const user = db.users.find((u) => u.id === session.id);
 
     if (!user) {

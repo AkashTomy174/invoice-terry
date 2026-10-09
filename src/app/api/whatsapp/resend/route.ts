@@ -10,7 +10,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'purchaseId is required' }, { status: 400 });
     }
 
-    const db = readDb();
+    const db = await readDb();
     const purchase = db.purchases.find((p) => p.id === purchaseId);
     if (!purchase) {
       return NextResponse.json({ success: false, error: 'Purchase not found' }, { status: 404 });

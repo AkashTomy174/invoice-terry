@@ -6,7 +6,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'purchases'; // purchases | customers | loyalty
 
-    const db = readDb();
+    const db = await readDb();
 
     if (type === 'customers') {
       const headers = [

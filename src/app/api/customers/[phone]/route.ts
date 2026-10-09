@@ -9,7 +9,7 @@ export async function GET(
     const { phone: rawPhone } = await params;
     const phone = normalizePhone(rawPhone);
 
-    const db = readDb();
+    const db = await readDb();
     const customer = db.customers.find((c) => c.phone === phone);
 
     if (!customer) {

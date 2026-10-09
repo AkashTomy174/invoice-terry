@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   const token = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
 
-  const db = readDb();
+  const db = await readDb();
   const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || db.shop_settings.whatsapp_verify_token;
 
   if (mode === 'subscribe' && token === verifyToken) {

@@ -11,7 +11,7 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'Missing invoice id' }, { status: 400 });
     }
 
-    const db = readDb();
+    const db = await readDb();
     const purchase = db.purchases.find(
       (p) => p.id === id || p.invoice_number.toLowerCase() === id.toLowerCase()
     );

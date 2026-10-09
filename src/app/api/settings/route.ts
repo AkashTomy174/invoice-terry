@@ -5,7 +5,7 @@ import { getServerSession, isAdmin } from '@/lib/auth';
 
 export async function GET() {
   try {
-    const db = readDb();
+    const db = await readDb();
     const { whatsapp_access_token, ...settings } = db.shop_settings;
     // Secret token never leaves the server; mask it so the settings form
     // can show "a token is set" without exposing the real value.
