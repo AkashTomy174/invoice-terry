@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Pinyon+Script&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+@import "tailwindcss";
+
+.font-script {
+  font-family: 'Pinyon Script', 'Alex Brush', cursive;
+}
+
+.font-serif-luxury {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+:root {
+  --background: #f5f5f5;
+  --foreground: #111111;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+@media print {
+  @page {
+    size: auto;
+    margin: 5mm;
+  }
+
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .cash-memo-sheet {
+    box-shadow: none !important;
+    border: 2px solid #000000 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    page-break-inside: avoid;
+  }
+}
