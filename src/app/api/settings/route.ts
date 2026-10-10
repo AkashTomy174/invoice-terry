@@ -18,17 +18,10 @@ export async function GET() {
   await connection();
   try {
     const db = await readDb();
-    const { whatsapp_access_token, ...settings } = db.shop_settings;
-    // Secret token never leaves the server; mask it so the settings form
-    // can show "a token is set" without exposing the real value.
-    const settingsForClient = {
-      ...settings,
-      whatsapp_access_token: whatsapp_access_token ? '••••••••' : '',
-    };
     const currentYear = new Date().getFullYear();
     const nextSeq = db.meta.invoice_sequence || 1;
     const next_invoice_number = `INV-${currentYear}-${String(nextSeq).padStart(6, '0')}`;
-    return NextResponse.json({ success: true, settings: settingsForClient, next_invoice_number });
+    return NextResponse.json({ success: true, settings: db.shop_settings, next_invoice_number });
   } catch (err) {
     return NextResponse.json({ success: false, error: getErrorMessage(err) }, { status: 500 });
   }
@@ -81,27 +74,6 @@ export async function PUT(request: Request) {
 
       if (body.whatsapp_mode === 'DEMO' || body.whatsapp_mode === 'PRODUCTION') {
         current.whatsapp_mode = body.whatsapp_mode;
-      }
-
-      if (body.whatsapp_phone_number_id !== undefined) {
-        current.whatsapp_phone_number_id = body.whatsapp_phone_number_id.trim();
-      }
-
-      if (body.whatsapp_business_account_id !== undefined) {
-        current.whatsapp_business_account_id = body.whatsapp_business_account_id.trim();
-      }
-
-      if (body.whatsapp_api_version !== undefined) {
-        current.whatsapp_api_version = body.whatsapp_api_version.trim();
-      }
-
-      if (body.whatsapp_verify_token !== undefined) {
-        current.whatsapp_verify_token = body.whatsapp_verify_token.trim();
-      }
-
-      // Only update token if a new real token is provided (not masked)
-      if (body.whatsapp_access_token && !body.whatsapp_access_token.includes('••••')) {
-        current.whatsapp_access_token = body.whatsapp_access_token.trim();
       }
 
       if (body.message_templates) {

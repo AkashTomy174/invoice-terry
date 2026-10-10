@@ -6,6 +6,7 @@ import { Download, Printer, ArrowLeft } from 'lucide-react';
 import CashMemoPreview from '@/components/CashMemoPreview';
 import { Purchase, ShopSettings } from '@/lib/types';
 import { generateInvoicePdf } from '@/lib/pdf';
+import { getErrorMessage } from '@/lib/errors';
 import Link from 'next/link';
 
 function InvoiceContent() {
@@ -29,8 +30,8 @@ function InvoiceContent() {
         } else {
           setError(data.error || 'Invoice not found');
         }
-      } catch (err: any) {
-        setError(err.message || 'Failed to load invoice');
+      } catch (err) {
+        setError(getErrorMessage(err) || 'Failed to load invoice');
       } finally {
         setLoading(false);
       }

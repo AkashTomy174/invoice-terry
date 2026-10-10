@@ -20,6 +20,8 @@ import CashMemoPreview from '@/components/CashMemoPreview';
 import WhatsAppSuccessModal from '@/components/WhatsAppSuccessModal';
 import { Customer, ShopSettings, PaymentMethod, Purchase, RoundOffMode } from '@/lib/types';
 import { calculateBilling } from '@/lib/billing';
+import { SendWhatsAppResult } from '@/lib/whatsapp';
+import { getErrorMessage } from '@/lib/errors';
 import { toPng, toBlob } from 'html-to-image';
 
 export default function BillingPage() {
@@ -30,7 +32,8 @@ export default function BillingPage() {
   const [weight, setWeight] = useState<number | string>(1000);
   const [unit, setUnit] = useState<'g' | 'kg'>('g');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
-  const [itemDesc, setItemDesc] = useState('Ladies Readymade Garment / Dress Material');
+  // No UI control edits this yet - it's always sent as this fixed default.
+  const itemDesc = 'Ladies Readymade Garment / Dress Material';
   const [roundOffMode, setRoundOffMode] = useState<RoundOffMode>('FLOOR_10');
   const [manualAmount, setManualAmount] = useState<string>('');
 
@@ -43,17 +46,12 @@ export default function BillingPage() {
 
   // Success Modal States
   const [completedPurchase, setCompletedPurchase] = useState<Purchase | null>(null);
-  const [whatsappResult, setWhatsappResult] = useState<any>(null);
+  const [whatsappResult, setWhatsappResult] = useState<SendWhatsAppResult | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [billImageDataUrl, setBillImageDataUrl] = useState<string | null>(null);
 
   const [nextInvoiceNumber, setNextInvoiceNumber] = useState<string>('INV-2026-000101');
-
-  // Fetch shop settings on mount
-  useEffect(() => {
-    fetchSettings();
-  }, []);
 
   const fetchSettings = async () => {
     try {
@@ -73,15 +71,11 @@ export default function BillingPage() {
     }
   };
 
-  // Debounced Phone Search
+  // Fetch shop settings on mount
   useEffect(() => {
-    const cleanPhone = phone.replace(/\D/g, '');
-    if (cleanPhone.length >= 10) {
-      searchCustomer(cleanPhone);
-    } else {
-      setCustomer(null);
-    }
-  }, [phone]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchSettings();
+  }, []);
 
   const searchCustomer = async (searchPhone: string) => {
     setIsSearchingCustomer(true);
@@ -105,6 +99,21 @@ export default function BillingPage() {
       setIsSearchingCustomer(false);
     }
   };
+
+  // Debounced Phone Search
+  useEffect(() => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length >= 10) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      searchCustomer(cleanPhone);
+    } else {
+      setCustomer(null);
+    }
+    // searchCustomer is a plain function recreated every render; adding it
+    // to the deps would re-run this on every render instead of only when
+    // the phone field actually changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phone]);
 
   // Perform Real-Time Billing Calculation
   const numericWeight = typeof weight === 'number' ? weight : parseFloat(weight) || 0;
@@ -208,10 +217,10 @@ export default function BillingPage() {
       }
 
       // Step 3: Copy image to clipboard so Ctrl+V in WhatsApp Web pastes photo directly!
-      if (capturedBlob && navigator.clipboard && (window as any).ClipboardItem) {
+      if (capturedBlob && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
         try {
           await navigator.clipboard.write([
-            new (window as any).ClipboardItem({ 'image/png': capturedBlob }),
+            new ClipboardItem({ 'image/png': capturedBlob }),
           ]);
         } catch (clipErr) {
           console.warn('Clipboard write warning:', clipErr);
@@ -241,8 +250,8 @@ export default function BillingPage() {
           window.print();
         }, 300);
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Error completing purchase');
+    } catch (err) {
+      setErrorMessage(getErrorMessage(err) || 'Error completing purchase');
     } finally {
       setIsSubmitting(false);
     }
@@ -261,6 +270,20 @@ export default function BillingPage() {
       const data = await res.json();
       if (data.success) {
         setWhatsappResult(data.result);
+        // Manual-send mode: resend only regenerates the link server-side,
+        // it never dispatches anything itself - open WhatsApp with the
+        // (possibly updated) text so the cashier can actually hit Send.
+        const result: SendWhatsAppResult = data.result;
+        if (result && !result.isDemo && result.formattedText) {
+          const cleanDigits = completedPurchase.customer_phone.replace(/\D/g, '');
+          const destination = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+          const encodedText = encodeURIComponent(result.formattedText);
+          const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+          const waUrl = isMobile
+            ? `https://wa.me/${destination}?text=${encodedText}`
+            : `https://web.whatsapp.com/send?phone=${destination}&text=${encodedText}`;
+          window.open(waUrl, '_blank');
+        }
       }
     } catch (err) {
       console.error(err);

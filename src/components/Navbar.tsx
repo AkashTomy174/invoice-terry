@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -12,28 +13,24 @@ import {
   FileSpreadsheet,
   Settings,
   Sparkles,
-  ShieldCheck,
   LogIn,
   LogOut,
   Menu,
   X,
 } from 'lucide-react';
 
+interface AuthUser {
+  id: string;
+  username: string;
+  name: string;
+  role: 'ADMIN' | 'STAFF';
+}
+
 export default function Navbar() {
   const pathname = usePathname();
   const [whatsappMode, setWhatsappMode] = useState<'DEMO' | 'PRODUCTION'>('DEMO');
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    fetchSettings();
-    checkAuth();
-  }, []);
-
-  // Close mobile menu on route change
-  useEffect(() => {
-    setIsMobileMenuOpen(false);
-  }, [pathname]);
 
   const fetchSettings = async () => {
     try {
@@ -54,6 +51,20 @@ export default function Navbar() {
       }
     } catch {}
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchSettings();
+    checkAuth();
+  }, []);
+
+  // Close the mobile menu whenever the route changes (e.g. a nav link was
+  // tapped). There's no prop-driven equivalent without remounting the whole
+  // menu subtree on every navigation, so this stays an effect.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
 
   const handleToggleMode = async () => {
     const nextMode = whatsappMode === 'DEMO' ? 'PRODUCTION' : 'DEMO';
@@ -98,9 +109,11 @@ export default function Navbar() {
             {/* Left: Brand Logo & Name */}
             <div className="flex items-center gap-3">
               <Link href="/" className="flex items-center gap-2.5 group">
-                <img
+                <Image
                   src="/logo.png"
                   alt="Terry Women"
+                  width={36}
+                  height={36}
                   className="w-9 h-9 rounded-full object-contain border border-emerald-900/60 shadow-xs group-hover:scale-105 transition-transform"
                 />
                 <span className="text-xl sm:text-2xl font-black tracking-widest text-white group-hover:text-neutral-300 transition-colors uppercase">

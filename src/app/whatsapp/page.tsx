@@ -7,52 +7,29 @@ import {
   ShieldCheck,
   Save,
   CheckCircle2,
-  Key,
-  Globe,
-  RefreshCw,
-  Send,
-  AlertCircle,
 } from 'lucide-react';
-import { ShopSettings, WhatsAppMessage } from '@/lib/types';
+import { Purchase, ShopSettings, WhatsAppMessage } from '@/lib/types';
 
 export default function WhatsAppCenterPage() {
-  const [settings, setSettings] = useState<ShopSettings | null>(null);
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Form states
   const [mode, setMode] = useState<'DEMO' | 'PRODUCTION'>('DEMO');
-  const [phoneNumberId, setPhoneNumberId] = useState('');
-  const [businessAccountId, setBusinessAccountId] = useState('');
-  const [accessToken, setAccessToken] = useState('');
-  const [apiVersion, setApiVersion] = useState('v20.0');
-  const [verifyToken, setVerifyToken] = useState('');
 
   // Message template states
   const [purchaseTemplate, setPurchaseTemplate] = useState('');
   const [progressTemplate, setProgressTemplate] = useState('');
   const [rewardTemplate, setRewardTemplate] = useState('');
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
-    setIsLoading(true);
     try {
       const res = await fetch('/api/settings');
       const data = await res.json();
       if (data.success && data.settings) {
-        const s = data.settings;
-        setSettings(s);
+        const s: ShopSettings = data.settings;
         setMode(s.whatsapp_mode || 'DEMO');
-        setPhoneNumberId(s.whatsapp_phone_number_id || '');
-        setBusinessAccountId(s.whatsapp_business_account_id || '');
-        setAccessToken(s.whatsapp_access_token || '');
-        setApiVersion(s.whatsapp_api_version || 'v20.0');
-        setVerifyToken(s.whatsapp_verify_token || '');
 
         setPurchaseTemplate(s.message_templates?.purchase_confirmation || '');
         setProgressTemplate(s.message_templates?.loyalty_progress || '');
@@ -64,13 +41,14 @@ export default function WhatsAppCenterPage() {
       const invData = await invRes.json();
       if (invData.success) {
         // Build mock/real messages list from purchases
-        const msgList: WhatsAppMessage[] = invData.purchases.map((p: any) => ({
+        const msgList: WhatsAppMessage[] = invData.purchases.map((p: Purchase) => ({
           id: p.id,
           purchase_id: p.id,
+          customer_id: p.customer_id,
           phone: p.customer_phone,
-          message_type: 'INVOICE',
+          message_type: 'INVOICE' as const,
           content: `Invoice ${p.invoice_number} - Amount: ₹${p.final_amount}`,
-          status: 'DELIVERED',
+          status: 'DELIVERED' as const,
           is_demo: mode === 'DEMO',
           created_at: p.created_at,
           updated_at: p.created_at,
@@ -79,10 +57,18 @@ export default function WhatsAppCenterPage() {
       }
     } catch (err) {
       console.error(err);
-    } finally {
-      setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    // One-shot fetch-on-mount: fetchData sets several pieces of state
+    // itself (mode, templates, messages) as its results arrive rather than
+    // the effect doing it, which is the documented escape hatch from the
+    // new set-state-in-effect rule for this very common pattern.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,10 +78,6 @@ export default function WhatsAppCenterPage() {
     try {
       const payload: Partial<ShopSettings> = {
         whatsapp_mode: mode,
-        whatsapp_phone_number_id: phoneNumberId,
-        whatsapp_business_account_id: businessAccountId,
-        whatsapp_api_version: apiVersion,
-        whatsapp_verify_token: verifyToken,
         message_templates: {
           purchase_confirmation: purchaseTemplate,
           loyalty_progress: progressTemplate,
@@ -103,10 +85,6 @@ export default function WhatsAppCenterPage() {
           reward_redeemed: '',
         },
       };
-
-      if (accessToken && !accessToken.includes('••••')) {
-        payload.whatsapp_access_token = accessToken;
-      }
 
       const res = await fetch('/api/settings', {
         method: 'PUT',
@@ -195,103 +173,6 @@ export default function WhatsAppCenterPage() {
                     Opens WhatsApp (Web or mobile) with the invoice text pre-filled so a cashier can hit
                     Send. No Meta Business API, no per-message cost - ever.
                   </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Official Meta Credentials Card */}
-            <div className="bg-white p-6 rounded-xl border border-neutral-200 shadow-xs space-y-4">
-              <div className="flex items-center gap-2 border-b pb-3">
-                <Key className="w-5 h-5 text-neutral-800" />
-                <h3 className="text-sm font-bold text-neutral-900">
-                  Meta Cloud API Credentials (Optional, Legacy)
-                </h3>
-              </div>
-
-              <div className="bg-amber-50 border border-amber-200 text-amber-900 text-[11px] rounded-lg p-3 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>
-                  These fields are not used to send messages - Manual Send never calls Meta&apos;s API, so
-                  there&apos;s nothing to pay for. They&apos;re kept only in case you want Meta&apos;s webhook
-                  to verify against this app later; you can safely leave them blank.
-                </span>
-              </div>
-
-              <div className="space-y-4 text-xs">
-                <div>
-                  <label className="block font-bold text-neutral-700 uppercase mb-1">
-                    WhatsApp Phone Number ID
-                  </label>
-                  <input
-                    type="text"
-                    value={phoneNumberId}
-                    onChange={(e) => setPhoneNumberId(e.target.value)}
-                    placeholder="e.g. 109283746592837"
-                    className="w-full px-3 py-2 border rounded-lg font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-neutral-700 uppercase mb-1">
-                    WhatsApp Business Account ID
-                  </label>
-                  <input
-                    type="text"
-                    value={businessAccountId}
-                    onChange={(e) => setBusinessAccountId(e.target.value)}
-                    placeholder="e.g. 982736451928374"
-                    className="w-full px-3 py-2 border rounded-lg font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-neutral-700 uppercase mb-1">
-                    Permanent System User Access Token
-                  </label>
-                  <input
-                    type="password"
-                    value={accessToken}
-                    onChange={(e) => setAccessToken(e.target.value)}
-                    placeholder="EAAB..."
-                    className="w-full px-3 py-2 border rounded-lg font-mono"
-                  />
-                  <p className="text-[11px] text-neutral-400 mt-1">
-                    Tokens are safely stored on the server and never exposed to the client.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-neutral-700 uppercase mb-1">
-                      API Version
-                    </label>
-                    <input
-                      type="text"
-                      value={apiVersion}
-                      onChange={(e) => setApiVersion(e.target.value)}
-                      placeholder="v20.0"
-                      className="w-full px-3 py-2 border rounded-lg font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-neutral-700 uppercase mb-1">
-                      Webhook Verify Token
-                    </label>
-                    <input
-                      type="text"
-                      value={verifyToken}
-                      onChange={(e) => setVerifyToken(e.target.value)}
-                      placeholder="terry_verify_token_2026"
-                      className="w-full px-3 py-2 border rounded-lg font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-neutral-50 p-3 rounded-lg border text-neutral-600 space-y-1">
-                  <span className="font-bold block text-neutral-900">Your Webhook Callback URL:</span>
-                  <code className="bg-white px-2 py-0.5 rounded border font-mono text-[11px] block select-all">
-                    https://your-domain.com/api/whatsapp/webhook
-                  </code>
                 </div>
               </div>
             </div>

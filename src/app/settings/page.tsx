@@ -5,14 +5,12 @@ import {
   Settings,
   Store,
   Tag,
-  Gift,
   Save,
   CheckCircle2,
 } from 'lucide-react';
-import { ShopSettings, RoundOffMode } from '@/lib/types';
+import { RoundOffMode } from '@/lib/types';
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<ShopSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -31,17 +29,12 @@ export default function SettingsPage() {
   const [requiredVisits, setRequiredVisits] = useState('5');
   const [roundOffMode, setRoundOffMode] = useState<RoundOffMode>('NEAREST_10');
 
-  useEffect(() => {
-    fetchSettings();
-  }, []);
-
   const fetchSettings = async () => {
     try {
       const res = await fetch('/api/settings');
       const data = await res.json();
       if (data.success && data.settings) {
         const s = data.settings;
-        setSettings(s);
         setShopName(s.shop_name || 'TERRY');
         setAddress(s.address || '');
         setPhone(s.phone || '+91 7736723917');
@@ -62,6 +55,11 @@ export default function SettingsPage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchSettings();
+  }, []);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

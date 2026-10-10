@@ -9,8 +9,6 @@ import {
   RotateCw,
   Ban,
   MessageSquare,
-  CheckCircle2,
-  XCircle,
   Eye,
   AlertTriangle,
   ChevronLeft,
@@ -20,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Purchase, ShopSettings } from '@/lib/types';
 import { generateInvoicePdf } from '@/lib/pdf';
+import { getErrorMessage } from '@/lib/errors';
 import CashMemoPreview from '@/components/CashMemoPreview';
 
 const PAGE_SIZE = 20;
@@ -49,11 +48,6 @@ export default function InvoicesPage() {
 
   // Resending state
   const [resendingId, setResendingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchInvoices();
-    fetchSettings();
-  }, [search, filterStatus, filterPaymentMethod, filterFrom, filterTo, page]);
 
   const fetchSettings = async () => {
     try {
@@ -90,6 +84,17 @@ export default function InvoicesPage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchInvoices();
+    fetchSettings();
+    // fetchInvoices/fetchSettings are intentionally left out of the deps -
+    // they're plain functions recreated every render, so including them
+    // would re-run this effect (and re-fetch) on every render instead of
+    // only when a filter/page actually changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, filterStatus, filterPaymentMethod, filterFrom, filterTo, page]);
 
   const hasActiveFilters = Boolean(filterStatus || filterPaymentMethod || filterFrom || filterTo);
 
@@ -154,8 +159,8 @@ export default function InvoicesPage() {
       }
       setCancellingPurchase(null);
       fetchInvoices();
-    } catch (err: any) {
-      setCancelError(err.message || 'Error during cancellation');
+    } catch (err) {
+      setCancelError(getErrorMessage(err) || 'Error during cancellation');
     } finally {
       setIsCancelling(false);
     }

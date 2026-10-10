@@ -7,18 +7,16 @@ import {
   Search,
   Phone,
   Gift,
-  ShoppingBag,
   History,
-  FileText,
   UserPlus,
   ArrowRight,
-  RotateCw,
   ChevronLeft,
   ChevronRight,
   CalendarDays,
   X,
 } from 'lucide-react';
 import { Customer, Purchase } from '@/lib/types';
+import { getErrorMessage } from '@/lib/errors';
 
 const PAGE_SIZE = 20;
 
@@ -46,10 +44,6 @@ export default function CustomersPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [addError, setAddError] = useState('');
 
-  useEffect(() => {
-    fetchCustomers();
-  }, [searchQuery, rewardOnly, filterFrom, filterTo, page]);
-
   const fetchCustomers = async () => {
     setIsLoading(true);
     try {
@@ -75,6 +69,15 @@ export default function CustomersPage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchCustomers();
+    // fetchCustomers is a plain function recreated every render; adding it
+    // to the deps would re-fetch on every render instead of only when a
+    // filter/page actually changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, rewardOnly, filterFrom, filterTo, page]);
 
   const hasActiveFilters = Boolean(rewardOnly || filterFrom || filterTo);
 
@@ -130,8 +133,8 @@ export default function CustomersPage() {
       setNewAddress('');
       fetchCustomers();
       handleSelectCustomer(data.customer);
-    } catch (err: any) {
-      setAddError(err.message || 'Error creating customer');
+    } catch (err) {
+      setAddError(getErrorMessage(err) || 'Error creating customer');
     } finally {
       setIsSaving(false);
     }

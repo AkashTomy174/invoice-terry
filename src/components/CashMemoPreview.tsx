@@ -44,19 +44,18 @@ export default function CashMemoPreview({
   const badgeTop = nameParts[0]?.toUpperCase() || 'BRIGHTSIDE';
   const badgeBottom = nameParts.slice(1).join(' ').toUpperCase() || 'STUDIO';
 
-  const [displayDate, setDisplayDate] = React.useState<string>('30/04/2026');
-
-  React.useEffect(() => {
-    if (dateStr) {
-      setDisplayDate(dateStr);
-    } else {
+  // Derived directly from props rather than useState+useEffect: dateStr (or
+  // "now" as a fallback) is all this ever needs, so there's no reason to
+  // route it through a second render.
+  const displayDate =
+    dateStr ||
+    (() => {
       const now = new Date();
       const dd = String(now.getDate()).padStart(2, '0');
       const mm = String(now.getMonth() + 1).padStart(2, '0');
       const yyyy = now.getFullYear();
-      setDisplayDate(`${dd}/${mm}/${yyyy}`);
-    }
-  }, [dateStr]);
+      return `${dd}/${mm}/${yyyy}`;
+    })();
 
   const totalDiscount = (discountAmount || 0) + (roundOff && roundOff < 0 ? Math.abs(roundOff) : 0);
 
@@ -129,6 +128,11 @@ export default function CashMemoPreview({
             {customerPhone && customerPhone !== '-' && (
               <p className="text-[11px] text-neutral-500 font-mono">
                 {customerPhone}
+              </p>
+            )}
+            {customerAddress && customerAddress !== '-' && (
+              <p className="text-[11px] text-neutral-500 max-w-[180px] ml-auto">
+                {customerAddress}
               </p>
             )}
           </div>

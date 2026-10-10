@@ -106,11 +106,6 @@ export interface ShopSettings {
   required_visits: number;
   round_off_mode?: RoundOffMode;
   whatsapp_mode: WhatsAppMode;
-  whatsapp_access_token?: string;
-  whatsapp_phone_number_id?: string;
-  whatsapp_business_account_id?: string;
-  whatsapp_api_version: string;
-  whatsapp_verify_token: string;
   message_templates?: {
     purchase_confirmation: string;
     loyalty_progress: string;

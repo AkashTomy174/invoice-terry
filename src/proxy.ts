@@ -2,16 +2,14 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getSessionFromRequest } from '@/lib/auth';
 
-// Requests that never need a session: the login flow itself, the external
-// Meta WhatsApp webhook (which authenticates with its own verify token),
-// the publicly-fetchable invoice photo (Meta's servers hit this URL
-// directly to pull the image, with no way to send our cookie), and the
-// keep-alive health check (hit by a scheduled task with no cookie at all).
+// Requests that never need a session: the login flow itself, the
+// publicly-fetchable invoice photo (opened directly in WhatsApp chats, with
+// no way to send our cookie), and the keep-alive health check (hit by a
+// scheduled task with no cookie at all).
 function isPublicRoute(pathname: string, method: string): boolean {
   if (pathname === '/login') return true;
   if (pathname === '/api/auth/login') return true;
   if (pathname === '/api/auth/logout') return true;
-  if (pathname === '/api/whatsapp/webhook') return true;
   if (pathname === '/api/health') return true;
   if (/^\/api\/invoices\/[^/]+\/image$/.test(pathname) && method === 'GET') return true;
   return false;

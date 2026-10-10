@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock, User, AlertCircle, ArrowRight } from 'lucide-react';
+import { getErrorMessage } from '@/lib/errors';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,8 +30,8 @@ export default function LoginPage() {
       }
 
       router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message || 'Login failed');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Login failed');
     } finally {
       setIsLoading(false);
     }

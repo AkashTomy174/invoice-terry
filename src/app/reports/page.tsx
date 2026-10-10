@@ -4,12 +4,8 @@ import React, { useState } from 'react';
 import {
   FileSpreadsheet,
   Download,
-  Calendar,
-  Filter,
-  CheckCircle2,
   TrendingUp,
   Users,
-  Scale,
 } from 'lucide-react';
 
 export default function ReportsPage() {
@@ -18,7 +14,16 @@ export default function ReportsPage() {
   const handleExportCsv = async (type: 'purchases' | 'customers') => {
     setDownloadingType(type);
     try {
-      window.location.href = `/api/reports/export?type=${type}`;
+      // This hits a route handler that responds with a file attachment
+      // (Content-Disposition), not a page - a plain <a> click triggers the
+      // browser's normal download handling without a client-side route
+      // navigation, unlike assigning window.location.href.
+      const link = document.createElement('a');
+      link.href = `/api/reports/export?type=${type}`;
+      link.rel = 'noopener';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
     } finally {
       setTimeout(() => setDownloadingType(null), 1000);
     }

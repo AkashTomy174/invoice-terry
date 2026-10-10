@@ -163,8 +163,6 @@ function createInitialSeed(): DatabaseSchema {
     min_weight_grams: 1000,
     required_visits: 5,
     whatsapp_mode: 'DEMO', // Demo mode enabled out of the box
-    whatsapp_api_version: 'v20.0',
-    whatsapp_verify_token: 'terry_verify_token_2026',
     round_off_mode: 'FLOOR_10',
     message_templates: {
       purchase_confirmation: 'Hi {{customer_name}} 👋\nThank you for shopping with us!\nYour purchase of {{weight}} has been recorded.\nInvoice Amount: ₹{{amount}}\nLoyalty progress: {{loyalty_count}}/5.\nThank you ❤️',

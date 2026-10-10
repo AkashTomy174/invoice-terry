@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import {
   CheckCircle2,
   MessageSquare,
@@ -13,7 +14,6 @@ import {
   ExternalLink,
   Image as ImageIcon,
   Check,
-  Sparkles,
 } from 'lucide-react';
 import { Purchase, ShopSettings } from '@/lib/types';
 import { generateInvoicePdf } from '@/lib/pdf';
@@ -62,7 +62,6 @@ export default function WhatsAppSuccessModal({
 
   if (!isOpen || !purchase) return null;
 
-  const shopPhone = settings?.whatsapp_number || settings?.phone || '+91 7736723917';
   const cleanCustomerPhone = purchase.customer_phone.replace(/\D/g, '');
   const destinationPhone = cleanCustomerPhone.length === 10 ? `91${cleanCustomerPhone}` : cleanCustomerPhone;
   const messageText = whatsappResult?.formattedText || '';
@@ -72,9 +71,9 @@ export default function WhatsAppSuccessModal({
     if (!billImageDataUrl) return false;
     try {
       const blob = dataUrlToBlob(billImageDataUrl);
-      if (navigator.clipboard && (window as any).ClipboardItem) {
+      if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
         await navigator.clipboard.write([
-          new (window as any).ClipboardItem({ 'image/png': blob }),
+          new ClipboardItem({ 'image/png': blob }),
         ]);
         setCopiedPhoto(true);
         setTimeout(() => setCopiedPhoto(false), 4000);
@@ -97,19 +96,15 @@ export default function WhatsAppSuccessModal({
     }
   };
 
-  // Open WhatsApp Web with clipboard photo copy
+  // Open WhatsApp - wa.me on a phone (opens the WhatsApp app directly),
+  // web.whatsapp.com on desktop - with a clipboard photo copy either way.
   const handleOpenWhatsApp = async () => {
     await copyPhotoToClipboard();
     const encodedText = encodeURIComponent(messageText);
-    const waUrl = `https://web.whatsapp.com/send?phone=${destinationPhone}&text=${encodedText}`;
-    window.open(waUrl, '_blank');
-  };
-
-  // Open Mobile wa.me link
-  const handleOpenMobileWhatsApp = async () => {
-    await copyPhotoToClipboard();
-    const encodedText = encodeURIComponent(messageText);
-    const waUrl = `https://wa.me/${destinationPhone}?text=${encodedText}`;
+    const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const waUrl = isMobile
+      ? `https://wa.me/${destinationPhone}?text=${encodedText}`
+      : `https://web.whatsapp.com/send?phone=${destinationPhone}&text=${encodedText}`;
     window.open(waUrl, '_blank');
   };
 
@@ -274,6 +269,18 @@ export default function WhatsAppSuccessModal({
               <ExternalLink className="w-4 h-4 opacity-75" />
             </button>
 
+            {onResend && (
+              <button
+                type="button"
+                onClick={onResend}
+                disabled={isResending}
+                className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-white hover:bg-neutral-50 text-neutral-700 border border-neutral-300 rounded-xl text-xs font-bold transition-all disabled:opacity-50"
+              >
+                <RotateCw className={`w-3.5 h-3.5 ${isResending ? 'animate-spin' : ''}`} />
+                <span>{isResending ? 'Regenerating link...' : 'Regenerate WhatsApp Link'}</span>
+              </button>
+            )}
+
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -334,10 +341,16 @@ export default function WhatsAppSuccessModal({
 
               {showPhotoPreview && (
                 <div className="p-3 bg-[#e5e0d3] max-h-80 overflow-y-auto flex justify-center">
-                  <img
+                  {/* Locally-generated data: URL, not a next/image-optimizable
+                      remote asset - width/height are unknown ahead of time
+                      since the bill's aspect ratio depends on its content. */}
+                  <Image
                     src={billImageDataUrl}
                     alt="Terry Garments Floral Bill"
-                    className="max-w-full rounded-2xl shadow-lg border border-neutral-300"
+                    width={600}
+                    height={800}
+                    unoptimized
+                    className="max-w-full h-auto rounded-2xl shadow-lg border border-neutral-300"
                   />
                 </div>
               )}

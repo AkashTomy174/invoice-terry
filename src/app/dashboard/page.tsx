@@ -21,10 +21,6 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
   const fetchStats = async () => {
     try {
       const res = await fetch('/api/dashboard/stats');
@@ -38,6 +34,11 @@ export default function DashboardPage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchStats();
+  }, []);
 
   if (isLoading) {
     return (
