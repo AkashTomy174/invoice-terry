@@ -1,8 +1,15 @@
 import { NextResponse } from 'next/server';
+import { connection } from 'next/server';
 import { readDb } from '@/lib/db';
 import { getServerSession } from '@/lib/auth';
 
 export async function GET() {
+  // Reads the session cookie per-request. Must happen before the try/catch:
+  // under Cache Components, the dynamic bail-out this (and getServerSession's
+  // cookies() call) triggers is a throw, and a surrounding try/catch would
+  // swallow it, letting Next.js statically cache this route at build time
+  // with a permanent "not authenticated" response (the bug that broke login).
+  await connection();
   try {
     const session = await getServerSession();
     if (!session) {

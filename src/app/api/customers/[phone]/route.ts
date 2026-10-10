@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
+import { connection } from 'next/server';
 import { readDb, normalizePhone } from '@/lib/db';
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ phone: string }> }
 ) {
+  // See src/app/api/health/route.ts - forces per-request execution instead
+  // of a build-time static snapshot under Cache Components.
+  await connection();
   try {
     const { phone: rawPhone } = await params;
     const phone = normalizePhone(rawPhone);

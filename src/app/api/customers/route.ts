@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
+import { connection } from 'next/server';
 import { readDb, withTransaction, generateId, normalizePhone } from '@/lib/db';
 import { Customer } from '@/lib/types';
 
 export async function GET(request: Request) {
+  // See src/app/api/health/route.ts - without this, Cache Components bakes
+  // one static snapshot of the customer list in at build time forever.
+  await connection();
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q')?.trim().toLowerCase() || '';

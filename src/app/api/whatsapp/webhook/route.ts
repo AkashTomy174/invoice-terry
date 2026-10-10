@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
+import { connection } from 'next/server';
 import { readDb, withTransaction } from '@/lib/db';
 
 export async function GET(request: Request) {
+  // See src/app/api/health/route.ts - without this, Cache Components could
+  // bake in a single build-time response (a 403, since the build has no
+  // real hub.verify_token query param), permanently breaking Meta's webhook
+  // verification handshake.
+  await connection();
   const { searchParams } = new URL(request.url);
   const mode = searchParams.get('hub.mode');
   const token = searchParams.get('hub.verify_token');

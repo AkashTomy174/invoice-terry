@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
+import { connection } from 'next/server';
 import { readDb, withTransaction } from '@/lib/db';
 import { ShopSettings } from '@/lib/types';
 import { getServerSession, isAdmin } from '@/lib/auth';
 
 export async function GET() {
+  // See src/app/api/health/route.ts - forces per-request execution instead
+  // of a build-time static snapshot under Cache Components.
+  await connection();
   try {
     const db = await readDb();
     const { whatsapp_access_token, ...settings } = db.shop_settings;

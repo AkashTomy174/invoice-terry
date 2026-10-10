@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
+import { connection } from 'next/server';
 import { readDb } from '@/lib/db';
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // See src/app/api/health/route.ts - forces per-request execution instead
+  // of a build-time static snapshot under Cache Components.
+  await connection();
   try {
     const { id } = await params;
     if (!id) {

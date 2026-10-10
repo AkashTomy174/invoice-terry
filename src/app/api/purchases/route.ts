@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { connection } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { readDb, withTransaction, generateId, normalizePhone, INVOICES_DIR } from '@/lib/db';
@@ -32,6 +33,9 @@ function saveInvoiceImage(purchaseId: string, imageDataUrl: string) {
 }
 
 export async function GET(request: Request) {
+  // See src/app/api/health/route.ts - forces per-request execution instead
+  // of a build-time static snapshot under Cache Components.
+  await connection();
   try {
     const { searchParams } = new URL(request.url);
     const pageSize = Math.max(1, Math.min(200, parseInt(searchParams.get('limit') || searchParams.get('pageSize') || '50', 10) || 50));
