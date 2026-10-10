@@ -3,10 +3,18 @@ import { Purchase, ShopSettings, WhatsAppMessage } from './types';
 export interface SendWhatsAppResult {
   success: boolean;
   isDemo: boolean;
-  status: 'SENT' | 'DELIVERED' | 'FAILED';
+  status: 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED';
   messageId?: string;
   errorMessage?: string;
   formattedText: string;
+  /**
+   * A wa.me manual-send link pre-filled with the invoice text. Present only
+   * for non-demo sends. Opening it (or web.whatsapp.com/send) requires a
+   * human to tap "Send" - there is no automated dispatch and no Meta
+   * Business API call anywhere in this flow, so no per-message cost can
+   * ever be incurred.
+   */
+  manualLink?: string;
 }
 
 /**
@@ -53,7 +61,35 @@ export function formatWhatsAppInvoiceText(purchase: Purchase, settings: ShopSett
 }
 
 /**
- * Send WhatsApp Invoice via Meta Business Cloud API or Demo Simulator
+ * Normalize a customer phone number to the digits-only, country-coded form
+ * wa.me and Meta's API both expect (default India country code for bare
+ * 10-digit numbers).
+ */
+function normalizeRecipientPhone(rawPhone: string): string {
+  let recipientPhone = rawPhone.replace(/\D/g, '');
+  if (recipientPhone.length === 10) {
+    recipientPhone = `91${recipientPhone}`;
+  }
+  return recipientPhone;
+}
+
+/**
+ * Build a wa.me manual-send link pre-filled with the invoice text.
+ */
+export function buildWhatsAppManualLink(purchase: Purchase, formattedText: string): string {
+  const recipientPhone = normalizeRecipientPhone(purchase.customer_phone);
+  return `https://wa.me/${recipientPhone}?text=${encodeURIComponent(formattedText)}`;
+}
+
+/**
+ * Prepare a WhatsApp invoice send.
+ *
+ * There is NO Meta WhatsApp Business Cloud API call anywhere in this
+ * module - it was removed deliberately so this app can never incur a
+ * per-message Meta charge, regardless of what whatsapp_mode or credentials
+ * are configured. Every non-demo "send" is a wa.me manual link: a human
+ * (the cashier) still has to open it and tap Send in WhatsApp themselves,
+ * so the status is reported as PENDING until that happens.
  */
 export async function sendWhatsAppInvoice(
   purchase: Purchase,
@@ -63,7 +99,7 @@ export async function sendWhatsAppInvoice(
   const formattedText = formatWhatsAppInvoiceText(purchase, settings, imageUrl);
   const isDemo = settings.whatsapp_mode === 'DEMO';
 
-  // Demo Mode Simulation
+  // Demo Mode Simulation - no message of any kind leaves the app.
   if (isDemo) {
     return {
       success: true,
@@ -74,92 +110,16 @@ export async function sendWhatsAppInvoice(
     };
   }
 
-  // Production Mode: Meta WhatsApp Business Cloud API
-  const token = process.env.WHATSAPP_ACCESS_TOKEN || settings.whatsapp_access_token;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || settings.whatsapp_phone_number_id;
-  const apiVersion = process.env.WHATSAPP_API_VERSION || settings.whatsapp_api_version || 'v20.0';
+  // Manual mode: build a wa.me link instead of calling Meta's paid API.
+  // This always succeeds - there's no network call, no credentials to be
+  // missing, and nothing that can be rejected by Meta.
+  const manualLink = buildWhatsAppManualLink(purchase, formattedText);
 
-  if (!token || !phoneNumberId) {
-    return {
-      success: false,
-      isDemo: false,
-      status: 'FAILED',
-      errorMessage: 'WhatsApp credentials missing: WHATSAPP_ACCESS_TOKEN or WHATSAPP_PHONE_NUMBER_ID is not configured.',
-      formattedText,
-    };
-  }
-
-  try {
-    // Normalize destination number to E.164 without '+'
-    let recipientPhone = purchase.customer_phone.replace(/\D/g, '');
-    if (recipientPhone.length === 10) {
-      recipientPhone = `91${recipientPhone}`; // Default India country code
-    }
-
-    const endpoint = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`;
-
-    const hasValidImage = Boolean(imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')));
-
-    const payload = hasValidImage
-      ? {
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: recipientPhone,
-          type: 'image',
-          image: {
-            link: imageUrl,
-            caption: formattedText,
-          },
-        }
-      : {
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: recipientPhone,
-          type: 'text',
-          text: {
-            preview_url: true,
-            body: formattedText,
-          },
-        };
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('WhatsApp API Error:', data);
-      return {
-        success: false,
-        isDemo: false,
-        status: 'FAILED',
-        errorMessage: data.error?.message || `WhatsApp API error ${response.status}`,
-        formattedText,
-      };
-    }
-
-    const messageId = data.messages?.[0]?.id || `wamid_${Date.now()}`;
-    return {
-      success: true,
-      isDemo: false,
-      status: 'SENT',
-      messageId,
-      formattedText,
-    };
-  } catch (err: any) {
-    console.error('Network error sending WhatsApp message:', err);
-    return {
-      success: false,
-      isDemo: false,
-      status: 'FAILED',
-      errorMessage: err.message || 'Unknown network error occurred',
-      formattedText,
-    };
-  }
+  return {
+    success: true,
+    isDemo: false,
+    status: 'PENDING',
+    formattedText,
+    manualLink,
+  };
 }

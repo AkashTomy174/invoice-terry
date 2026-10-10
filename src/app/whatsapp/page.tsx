@@ -132,10 +132,12 @@ export default function WhatsAppCenterPage() {
       <div>
         <h1 className="text-2xl font-black tracking-tight text-neutral-900 flex items-center gap-2">
           <MessageSquare className="w-7 h-7 text-neutral-900" />
-          <span>WhatsApp Integration & Cloud API Center</span>
+          <span>WhatsApp Integration Center</span>
         </h1>
         <p className="text-xs text-neutral-500 mt-1">
-          Configure the official Meta WhatsApp Business Cloud API or run in zero-credential Demo Mode.
+          This app never calls Meta&apos;s paid WhatsApp Business API, so sending invoices is always free.
+          Use Demo Mode to simulate sends, or Manual Send to open WhatsApp with the invoice pre-filled for a
+          cashier to tap Send themselves.
         </p>
       </div>
 
@@ -169,11 +171,11 @@ export default function WhatsAppCenterPage() {
                 >
                   <div className="flex items-center gap-2 font-bold text-sm text-neutral-900 mb-1">
                     <Sparkles className="w-4 h-4 text-amber-600" />
-                    <span>Demo Mode (Active)</span>
+                    <span>Demo Mode</span>
                   </div>
                   <p className="text-xs text-neutral-500 leading-relaxed">
                     Zero setup required. Invoices are simulated with realistic WhatsApp previews and logs
-                    without calling external Meta servers.
+                    - nothing is sent anywhere.
                   </p>
                 </div>
 
@@ -187,11 +189,11 @@ export default function WhatsAppCenterPage() {
                 >
                   <div className="flex items-center gap-2 font-bold text-sm text-neutral-900 mb-1">
                     <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    <span>Production Mode</span>
+                    <span>Manual Send</span>
                   </div>
                   <p className="text-xs text-neutral-500 leading-relaxed">
-                    Dispatches live WhatsApp messages to customers via your official Meta Business Cloud
-                    API credentials.
+                    Opens WhatsApp (Web or mobile) with the invoice text pre-filled so a cashier can hit
+                    Send. No Meta Business API, no per-message cost - ever.
                   </p>
                 </div>
               </div>
@@ -202,8 +204,17 @@ export default function WhatsAppCenterPage() {
               <div className="flex items-center gap-2 border-b pb-3">
                 <Key className="w-5 h-5 text-neutral-800" />
                 <h3 className="text-sm font-bold text-neutral-900">
-                  Official WhatsApp Cloud API Credentials
+                  Meta Cloud API Credentials (Optional, Legacy)
                 </h3>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 text-amber-900 text-[11px] rounded-lg p-3 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>
+                  These fields are not used to send messages - Manual Send never calls Meta&apos;s API, so
+                  there&apos;s nothing to pay for. They&apos;re kept only in case you want Meta&apos;s webhook
+                  to verify against this app later; you can safely leave them blank.
+                </span>
               </div>
 
               <div className="space-y-4 text-xs">
@@ -410,7 +421,7 @@ export default function WhatsAppCenterPage() {
                     </span>
                   </div>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                    {mode === 'DEMO' ? 'SIMULATED: ' : ''}DELIVERED
+                    {mode === 'DEMO' ? 'SIMULATED' : 'LINK READY (MANUAL SEND)'}
                   </span>
                 </div>
               ))}

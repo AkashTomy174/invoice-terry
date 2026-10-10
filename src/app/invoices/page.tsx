@@ -117,6 +117,20 @@ export default function InvoicesPage() {
       });
       const data = await res.json();
       if (data.success) {
+        // Manual-send mode: no message is dispatched automatically (there's
+        // no paid Meta API call anywhere in this app), so open WhatsApp
+        // with the invoice text pre-filled and let the cashier tap Send.
+        const result = data.result;
+        if (result && !result.isDemo && result.formattedText) {
+          const cleanDigits = purchase.customer_phone.replace(/\D/g, '');
+          const destination = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+          const encodedText = encodeURIComponent(result.formattedText);
+          const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+          const waUrl = isMobile
+            ? `https://wa.me/${destination}?text=${encodedText}`
+            : `https://web.whatsapp.com/send?phone=${destination}&text=${encodedText}`;
+          window.open(waUrl, '_blank');
+        }
         fetchInvoices();
       }
     } catch (err) {
