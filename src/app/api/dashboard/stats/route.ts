@@ -2,6 +2,15 @@ import { NextResponse } from 'next/server';
 import { connection } from 'next/server';
 import { readDb } from '@/lib/db';
 import { DashboardStats, PaymentMethod } from '@/lib/types';
+import { getErrorMessage } from '@/lib/errors';
+
+// Belt-and-suspenders: force dynamic rendering even if Cache Components
+// (next.config.ts) is ever re-enabled, or on a Next.js version where it's
+// on by default. This directive is the long-stable mechanism for opting a
+// Route Handler out of static optimization; connection() below is the
+// Cache-Components-specific escape hatch. Belonging to both worlds means
+// this route can never again get silently baked into a build-time cache.
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   // See src/app/api/health/route.ts - forces per-request execution instead
@@ -92,7 +101,7 @@ export async function GET() {
     };
 
     return NextResponse.json({ success: true, stats });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: getErrorMessage(err) }, { status: 500 });
   }
 }

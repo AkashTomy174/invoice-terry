@@ -3,6 +3,14 @@ import { connection } from 'next/server';
 import { readDb } from '@/lib/db';
 import { getServerSession } from '@/lib/auth';
 
+// Belt-and-suspenders: force dynamic rendering even if Cache Components
+// (next.config.ts) is ever re-enabled, or on a Next.js version where it's
+// on by default. This directive is the long-stable mechanism for opting a
+// Route Handler out of static optimization; connection() below is the
+// Cache-Components-specific escape hatch. Belonging to both worlds means
+// this route can never again get silently baked into a build-time cache.
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   // Reads the session cookie per-request. Must happen before the try/catch:
   // under Cache Components, the dynamic bail-out this (and getServerSession's

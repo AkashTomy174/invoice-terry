@@ -1,12 +1,17 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { getErrorMessage } from '@/lib/errors';
+import { INVOICES_DIR, getInvoiceImageCache } from '@/lib/db';
+
+// Belt-and-suspenders: force dynamic rendering even if Cache Components
+// (next.config.ts) is ever re-enabled. This route serves per-id binary data
+// out of a mutable memory cache / disk, so it must never be baked into a
+// build-time static response.
+export const dynamic = 'force-dynamic';
 
 // Memory cache fallback for serverless/readonly environments
-const memoryCache = (globalThis as any).__INVOICE_IMAGE_CACHE__ || new Map<string, Buffer>();
-(globalThis as any).__INVOICE_IMAGE_CACHE__ = memoryCache;
-
-import { INVOICES_DIR } from '@/lib/db';
+const memoryCache = getInvoiceImageCache();
 
 function ensureInvoicesDir() {
   try {
@@ -31,7 +36,7 @@ export async function GET(
     // Check in-memory cache first
     if (memoryCache.has(id)) {
       const buffer = memoryCache.get(id)!;
-      return new NextResponse(buffer, {
+      return new NextResponse(new Uint8Array(buffer), {
         status: 200,
         headers: {
           'Content-Type': 'image/png',
@@ -46,7 +51,7 @@ export async function GET(
     if (fs.existsSync(filePath)) {
       const buffer = fs.readFileSync(filePath);
       memoryCache.set(id, buffer);
-      return new NextResponse(buffer, {
+      return new NextResponse(new Uint8Array(buffer), {
         status: 200,
         headers: {
           'Content-Type': 'image/png',
@@ -57,9 +62,9 @@ export async function GET(
     }
 
     return NextResponse.json({ error: 'Invoice image not found' }, { status: 404 });
-  } catch (err: any) {
+  } catch (err) {
     console.error('Error serving invoice image:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
   }
 }
 
@@ -95,8 +100,8 @@ export async function POST(
       success: true,
       url: `/api/invoices/${id}/image`,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error('Error saving invoice image:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
   }
 }

@@ -2,10 +2,19 @@ import { NextResponse } from 'next/server';
 import { connection } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { readDb, withTransaction, generateId, normalizePhone, INVOICES_DIR } from '@/lib/db';
+import { readDb, withTransaction, generateId, normalizePhone, INVOICES_DIR, getInvoiceImageCache } from '@/lib/db';
 import { calculateBilling } from '@/lib/billing';
 import { sendWhatsAppInvoice } from '@/lib/whatsapp';
-import { Customer, Purchase, LoyaltyTransaction, WhatsAppMessage, PaymentMethod, RoundOffMode } from '@/lib/types';
+import { Purchase, LoyaltyTransaction, WhatsAppMessage, PaymentMethod, RoundOffMode } from '@/lib/types';
+import { getErrorMessage } from '@/lib/errors';
+
+// Belt-and-suspenders: force dynamic rendering even if Cache Components
+// (next.config.ts) is ever re-enabled, or on a Next.js version where it's
+// on by default. This directive is the long-stable mechanism for opting a
+// Route Handler out of static optimization; connection() below is the
+// Cache-Components-specific escape hatch. Belonging to both worlds means
+// this route can never again get silently baked into a build-time cache.
+export const dynamic = 'force-dynamic';
 
 function saveInvoiceImage(purchaseId: string, imageDataUrl: string) {
   try {
@@ -14,9 +23,7 @@ function saveInvoiceImage(purchaseId: string, imageDataUrl: string) {
     const buffer = Buffer.from(base64Content, 'base64');
     
     // Store in global memory cache
-    const memoryCache = (globalThis as any).__INVOICE_IMAGE_CACHE__ || new Map<string, Buffer>();
-    memoryCache.set(purchaseId, buffer);
-    (globalThis as any).__INVOICE_IMAGE_CACHE__ = memoryCache;
+    getInvoiceImageCache().set(purchaseId, buffer);
 
     // Store in filesystem if writable
     try {
@@ -94,8 +101,8 @@ export async function GET(request: Request) {
       pageSize,
       totalPages,
     });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: getErrorMessage(err) }, { status: 500 });
   }
 }
 
@@ -304,8 +311,8 @@ export async function POST(request: Request) {
       customer: updatedCustomer,
       whatsapp: waResult,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error('Purchase creation error:', err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: getErrorMessage(err) }, { status: 500 });
   }
 }

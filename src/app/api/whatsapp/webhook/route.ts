@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server';
 import { connection } from 'next/server';
 import { readDb, withTransaction } from '@/lib/db';
+import { getErrorMessage } from '@/lib/errors';
+
+// Belt-and-suspenders: force dynamic rendering even if Cache Components
+// (next.config.ts) is ever re-enabled, or on a Next.js version where it's
+// on by default. This directive is the long-stable mechanism for opting a
+// Route Handler out of static optimization; connection() below is the
+// Cache-Components-specific escape hatch. Belonging to both worlds means
+// this route can never again get silently baked into a build-time cache.
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   // See src/app/api/health/route.ts - without this, Cache Components could
@@ -37,10 +46,11 @@ export async function POST(request: Request) {
       await withTransaction((db) => {
         for (const item of statuses) {
           const wamid = item.id;
-          const status = item.status?.toUpperCase(); // SENT, DELIVERED, READ, FAILED
+          const status: string | undefined = item.status?.toUpperCase(); // SENT, DELIVERED, READ, FAILED
           const msg = db.whatsapp_messages.find((m) => m.message_id === wamid);
-          if (msg && ['SENT', 'DELIVERED', 'READ', 'FAILED'].includes(status)) {
-            msg.status = status === 'READ' ? 'DELIVERED' : (status as any);
+          if (msg && status && ['SENT', 'DELIVERED', 'READ', 'FAILED'].includes(status)) {
+            // Narrowed by the includes() check above, so this cast is safe.
+            msg.status = status === 'READ' ? 'DELIVERED' : (status as 'SENT' | 'DELIVERED' | 'FAILED');
             msg.updated_at = new Date().toISOString();
           }
         }
@@ -48,8 +58,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ status: 'ok' });
-  } catch (err: any) {
+  } catch (err) {
     console.error('Webhook processing error:', err);
-    return NextResponse.json({ status: 'error', error: err.message }, { status: 200 });
+    return NextResponse.json({ status: 'error', error: getErrorMessage(err) }, { status: 200 });
   }
 }

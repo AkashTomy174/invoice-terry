@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { readDb } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { createSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from '@/lib/auth';
+import { getErrorMessage } from '@/lib/errors';
 
 export async function POST(request: Request) {
   try {
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
     });
 
     return response;
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: getErrorMessage(err) }, { status: 500 });
   }
 }

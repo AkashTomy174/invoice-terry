@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { withTransaction, generateId } from '@/lib/db';
 import { LoyaltyTransaction } from '@/lib/types';
+import { getErrorMessage } from '@/lib/errors';
 
 export async function POST(
   _request: Request,
@@ -72,7 +73,7 @@ export async function POST(
     });
 
     return NextResponse.json({ success: true, ...result });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 400 });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: getErrorMessage(err) }, { status: 400 });
   }
 }

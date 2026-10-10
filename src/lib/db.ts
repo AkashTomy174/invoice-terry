@@ -44,6 +44,23 @@ export const DATA_DIR = isServerless
 export const INVOICES_DIR = path.join(DATA_DIR, 'invoices');
 
 // ---------------------------------------------------------------------------
+// In-memory invoice image fallback (serverless filesystems may be read-only
+// or ephemeral). Stashed on globalThis, typed, so it survives hot-reloads in
+// dev without every caller reaching for `as any`.
+// ---------------------------------------------------------------------------
+
+declare global {
+  var __INVOICE_IMAGE_CACHE__: Map<string, Buffer> | undefined;
+}
+
+export function getInvoiceImageCache(): Map<string, Buffer> {
+  if (!globalThis.__INVOICE_IMAGE_CACHE__) {
+    globalThis.__INVOICE_IMAGE_CACHE__ = new Map<string, Buffer>();
+  }
+  return globalThis.__INVOICE_IMAGE_CACHE__;
+}
+
+// ---------------------------------------------------------------------------
 // Postgres connection
 // ---------------------------------------------------------------------------
 

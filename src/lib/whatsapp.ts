@@ -1,4 +1,4 @@
-import { Purchase, ShopSettings, WhatsAppMessage } from './types';
+import { Purchase, ShopSettings } from './types';
 
 export interface SendWhatsAppResult {
   success: boolean;
