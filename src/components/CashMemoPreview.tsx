@@ -36,13 +36,8 @@ export default function CashMemoPreview({
   dateStr,
   settings,
 }: CashMemoPreviewProps) {
-  const rawShopName = settings?.shop_name || 'BRIGHTSIDE STUDIO';
   const shopPhone = settings?.phone || '123-456-7890';
-
-  // Format shop name for oval badge (Top line and Bottom line)
-  const nameParts = rawShopName.trim().split(/\s+/);
-  const badgeTop = nameParts[0]?.toUpperCase() || 'BRIGHTSIDE';
-  const badgeBottom = nameParts.slice(1).join(' ').toUpperCase() || 'STUDIO';
+  const logoUrl = settings?.logo_url || '/logo.png';
 
   // Derived directly from props rather than useState+useEffect: dateStr (or
   // "now" as a fallback) is all this ever needs, so there's no reason to
@@ -105,16 +100,15 @@ export default function CashMemoPreview({
             </p>
           </div>
 
-          {/* Top Center: Iconic Oval Badge */}
+          {/* Top Center: Shop Logo Badge */}
           <div className="col-span-4 flex justify-center">
-            <div className="border border-black rounded-[9999px] px-5 py-2 text-center min-w-[140px] sm:min-w-[160px] flex flex-col items-center justify-center">
-              <span className="serif-studio-heading text-[11px] sm:text-xs font-bold tracking-[0.22em] uppercase text-black leading-tight">
-                {badgeTop}
-              </span>
-              <span className="serif-studio-heading text-[10px] sm:text-[11px] font-medium tracking-[0.26em] uppercase text-black leading-tight">
-                {badgeBottom}
-              </span>
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element -- html-to-image capture needs a plain <img>, not next/image */}
+            <img
+              src={logoUrl}
+              alt="Shop Logo"
+              className="w-20 h-20 sm:w-24 sm:h-24 object-contain select-none"
+              draggable={false}
+            />
           </div>
 
           {/* Top Right: Invoice to */}
@@ -303,13 +297,15 @@ export default function CashMemoPreview({
         {/* ==============================================================
             6. BOTTOM SCRIPT CALLIGRAPHY: "Thank You"
            ============================================================== */}
-        <div className="mt-8 mb-4 sm:mt-10 sm:mb-6 text-center flex items-center justify-center">
+        <div className="mt-8 mb-4 sm:mt-10 sm:mb-6 text-center flex items-center justify-center gap-3 sm:gap-4">
+          <span className="text-2xl sm:text-3xl font-light text-black select-none">—</span>
           <p
             className="script-invoice-heading text-6xl sm:text-7xl text-black font-normal leading-none select-none tracking-wide"
             style={{ fontSize: 'clamp(3.5rem, 11vw, 5rem)' }}
           >
             Thank You
           </p>
+          <span className="text-2xl sm:text-3xl font-light text-black select-none">—</span>
         </div>
       </div>
     </>

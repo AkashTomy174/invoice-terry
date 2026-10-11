@@ -106,9 +106,9 @@ export default function InvoicesPage() {
     setPage(1);
   };
 
-  const handleDownloadPdf = (purchase: Purchase) => {
+  const handleDownloadPdf = async (purchase: Purchase) => {
     if (!shopSettings) return;
-    const doc = generateInvoicePdf(purchase, shopSettings);
+    const doc = await generateInvoicePdf(purchase, shopSettings);
     doc.save(`${purchase.invoice_number}.pdf`);
   };
 

@@ -39,9 +39,9 @@ function InvoiceContent() {
     fetchInvoice();
   }, [id]);
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     if (!purchase || !settings) return;
-    const doc = generateInvoicePdf(purchase, settings);
+    const doc = await generateInvoicePdf(purchase, settings);
     doc.save(`${purchase.invoice_number}.pdf`);
   };
 

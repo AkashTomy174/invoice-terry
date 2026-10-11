@@ -157,7 +157,6 @@ function createInitialSeed(): DatabaseSchema {
     address: 'Near Town Center, Main Commercial Road, Calicut - 673001',
     phone: '+91 7736723917',
     whatsapp_number: '+91 7736723917',
-    gstin: '32AAAAA0000A1Z5',
     rate_per_kg: 899,
     loyalty_discount: 449.50,
     min_weight_grams: 1000,

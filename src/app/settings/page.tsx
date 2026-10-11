@@ -20,7 +20,6 @@ export default function SettingsPage() {
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
-  const [gstin, setGstin] = useState('');
 
   // Pricing & Loyalty
   const [ratePerKg, setRatePerKg] = useState('899');
@@ -39,7 +38,6 @@ export default function SettingsPage() {
         setAddress(s.address || '');
         setPhone(s.phone || '+91 7736723917');
         setWhatsappNumber(s.whatsapp_number || '+91 7736723917');
-        setGstin(s.gstin || '');
 
         setRatePerKg(s.rate_per_kg?.toString() || '899');
         setLoyaltyDiscount(s.loyalty_discount?.toString() || '449.50');
@@ -75,7 +73,6 @@ export default function SettingsPage() {
           address,
           phone,
           whatsapp_number: whatsappNumber,
-          gstin,
           rate_per_kg: parseFloat(ratePerKg),
           loyalty_discount: parseFloat(loyaltyDiscount),
           min_weight_grams: parseInt(minWeightGrams, 10),
@@ -126,30 +123,15 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-4 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block font-bold text-neutral-700 uppercase mb-1">Shop Name</label>
-                <input
-                  type="text"
-                  required
-                  value={shopName}
-                  onChange={(e) => setShopName(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-sm font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-neutral-700 uppercase mb-1">
-                  GSTIN / Tax ID (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={gstin}
-                  onChange={(e) => setGstin(e.target.value)}
-                  placeholder="32AAAAA0000A1Z5"
-                  className="w-full px-3 py-2 border rounded-lg text-sm font-mono"
-                />
-              </div>
+            <div>
+              <label className="block font-bold text-neutral-700 uppercase mb-1">Shop Name</label>
+              <input
+                type="text"
+                required
+                value={shopName}
+                onChange={(e) => setShopName(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg text-sm font-bold"
+              />
             </div>
 
             <div>

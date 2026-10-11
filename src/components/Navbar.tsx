@@ -96,7 +96,7 @@ export default function Navbar() {
     { label: 'Invoices', href: '/invoices', icon: Receipt },
     { label: 'WhatsApp', href: '/whatsapp', icon: MessageSquare },
     { label: 'Reports', href: '/reports', icon: FileSpreadsheet },
-    // Admin-only: store rate, GSTIN, WhatsApp credentials, etc.
+    // Admin-only: store rate, WhatsApp credentials, etc.
     ...(isAdminUser ? [{ label: 'Settings', href: '/settings', icon: Settings }] : []),
   ];
 

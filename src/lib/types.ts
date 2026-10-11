@@ -99,7 +99,6 @@ export interface ShopSettings {
   address: string;
   phone: string;
   whatsapp_number: string;
-  gstin: string;
   rate_per_kg: number;
   loyalty_discount: number;
   min_weight_grams: number;

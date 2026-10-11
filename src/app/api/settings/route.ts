@@ -46,7 +46,6 @@ export async function PUT(request: Request) {
       if (body.address !== undefined) current.address = body.address.trim();
       if (body.phone !== undefined) current.phone = body.phone.trim();
       if (body.whatsapp_number !== undefined) current.whatsapp_number = body.whatsapp_number.trim();
-      if (body.gstin !== undefined) current.gstin = body.gstin.trim();
 
       if (body.rate_per_kg !== undefined) {
         const rate = parseFloat(body.rate_per_kg);
